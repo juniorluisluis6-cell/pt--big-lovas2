@@ -1,5 +1,9 @@
 {
-  "name": "BIG LOVA-FASHION",
+  "name": "BIG LOVA-FASHION ACADEMIA DE MODA",
   "description": "Exclusive fashion social network for premium networking, videos, photos, and style inspiration.",
-  "requestFramePermissions": ["camera", "microphone", "geolocation"]
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
 }
