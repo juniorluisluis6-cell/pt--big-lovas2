@@ -14,7 +14,7 @@ export default function Home() {
   const [isPosting, setIsPosting] = useState(false);
   const [caption, setCaption] = useState('');
   const [postType, setPostType] = useState<'photo' | 'video'>('photo');
-  const [file, setFile] = useState<File | null>(null);
+  const [mediaUrl, setMediaUrl] = useState('');
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
@@ -33,40 +33,12 @@ export default function Home() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      // Auto-detect type based on file
-      if (e.target.files[0].type.startsWith('video/')) {
-        setPostType('video');
-      } else {
-        setPostType('photo');
-      }
-    }
-  };
-
   const handleCreatePost = async () => {
     if (!user?.is_premium) return alert('Apenas membros premium podem publicar.');
-    if (!file) return alert('Selecione um arquivo para publicar.');
+    if (!mediaUrl.trim()) return alert('Insira o link da imagem ou vídeo.');
     
     setUploading(true);
     try {
-      // 1. Upload file
-      const formData = new FormData();
-      formData.append('file', file);
-      
-      const uploadRes = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-      
-      if (!uploadRes.ok) throw new Error('Falha no upload');
-      const uploadData = await uploadRes.json();
-      
-      // 2. Create post
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: {
@@ -75,14 +47,14 @@ export default function Home() {
         },
         body: JSON.stringify({
           type: postType,
-          url: uploadData.url,
+          url: mediaUrl,
           caption: caption || 'Estilo é uma forma de dizer quem você é sem ter que falar.'
         })
       });
       
       if (res.ok) {
         setCaption('');
-        setFile(null);
+        setMediaUrl('');
         setIsPosting(false);
         fetchPosts();
       }
@@ -163,50 +135,58 @@ export default function Home() {
         {/* Create Post (Premium Only) */}
         {user?.is_premium && (
           <div className="glass p-6 rounded-3xl border border-white/5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center border border-white/10 overflow-hidden">
-                <User className="w-8 h-8 text-zinc-400" />
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center border border-white/10 overflow-hidden">
+                  <User className="w-8 h-8 text-zinc-400" />
+                </div>
+                <textarea
+                  placeholder="O que você está vestindo hoje?"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-gold/50 min-h-[80px] resize-none"
+                  value={caption}
+                  onChange={e => setCaption(e.target.value)}
+                />
               </div>
-              <textarea
-                placeholder="O que você está vestindo hoje?"
-                className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-gold/50 min-h-[80px] resize-none"
-                value={caption}
-                onChange={e => setCaption(e.target.value)}
-              />
+              
+              <div className="flex items-center gap-3">
+                <input
+                  type="url"
+                  placeholder="Cole o link da imagem ou vídeo aqui (URL)"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-gold/50"
+                  value={mediaUrl}
+                  onChange={e => setMediaUrl(e.target.value)}
+                />
+              </div>
             </div>
             
-            <div className="flex items-center justify-between pt-4 border-t border-white/5">
-              <div className="flex gap-2 relative">
-                <input 
-                  type="file" 
-                  accept="image/*,video/*" 
-                  onChange={handleFileChange} 
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                />
+            <div className="flex items-center justify-between pt-4 border-t border-white/5 mt-4">
+              <div className="flex gap-2">
                 <button 
                   type="button"
+                  onClick={() => setPostType('photo')}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                    file && postType === 'photo' ? 'bg-gold text-black' : 'bg-white/5 text-zinc-400 hover:bg-white/10'
+                    postType === 'photo' ? 'bg-gold text-black' : 'bg-white/5 text-zinc-400 hover:bg-white/10'
                   }`}
                 >
-                  <Camera className="w-4 h-4" /> {file && postType === 'photo' ? 'Foto Selecionada' : 'Foto'}
+                  <Camera className="w-4 h-4" /> Foto
                 </button>
                 <button 
                   type="button"
+                  onClick={() => setPostType('video')}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                    file && postType === 'video' ? 'bg-red-500 text-white' : 'bg-white/5 text-zinc-400 hover:bg-white/10'
+                    postType === 'video' ? 'bg-red-500 text-white' : 'bg-white/5 text-zinc-400 hover:bg-white/10'
                   }`}
                 >
-                  <Video className="w-4 h-4" /> {file && postType === 'video' ? 'Vídeo Selecionado' : 'Vídeo'}
+                  <Video className="w-4 h-4" /> Vídeo
                 </button>
               </div>
               
               <button
                 onClick={handleCreatePost}
-                disabled={!caption.trim() || !file || uploading}
+                disabled={!caption.trim() || !mediaUrl.trim() || uploading}
                 className="gold-button px-8 py-2 rounded-full text-xs font-bold disabled:opacity-50 flex items-center gap-2"
               >
-                {uploading ? 'Enviando...' : 'Publicar'}
+                {uploading ? 'Publicando...' : 'Publicar'}
               </button>
             </div>
           </div>
