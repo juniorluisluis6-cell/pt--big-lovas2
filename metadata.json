@@ -1,0 +1,5 @@
+{
+  "name": "BIG LOVA-FASHION",
+  "description": "Exclusive fashion social network for premium networking, videos, photos, and style inspiration.",
+  "requestFramePermissions": ["camera", "microphone", "geolocation"]
+}
