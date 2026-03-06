@@ -7,9 +7,28 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import cors from "cors";
 import multer from "multer";
+import fs from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir);
+}
+
+// Configure multer
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const upload = multer({ storage: storage });
 
 const db = new Database("database.sqlite");
 const JWT_SECRET = "big-lova-secret-key-2026";
@@ -68,6 +87,7 @@ db.exec(`
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Auth Middleware
 const authenticateToken = (req: any, res: any, next: any) => {
@@ -156,6 +176,14 @@ app.get("/api/posts", (req, res) => {
     ORDER BY created_at DESC
   `).all();
   res.json(posts);
+});
+
+app.post("/api/upload", authenticateToken, upload.single('file'), (req: any, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+  const fileUrl = `/uploads/${req.file.filename}`;
+  res.json({ url: fileUrl });
 });
 
 app.post("/api/posts", authenticateToken, (req: any, res) => {

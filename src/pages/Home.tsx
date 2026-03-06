@@ -14,6 +14,8 @@ export default function Home() {
   const [isPosting, setIsPosting] = useState(false);
   const [caption, setCaption] = useState('');
   const [postType, setPostType] = useState<'photo' | 'video'>('photo');
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetchPosts();
@@ -31,15 +33,40 @@ export default function Home() {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+      // Auto-detect type based on file
+      if (e.target.files[0].type.startsWith('video/')) {
+        setPostType('video');
+      } else {
+        setPostType('photo');
+      }
+    }
+  };
+
   const handleCreatePost = async () => {
     if (!user?.is_premium) return alert('Apenas membros premium podem publicar.');
+    if (!file) return alert('Selecione um arquivo para publicar.');
     
-    // Simulate post creation with a random fashion image or video placeholder
-    const randomImg = postType === 'photo' 
-      ? `https://picsum.photos/seed/${Math.random()}/800/800`
-      : `https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4`; // Placeholder video
-    
+    setUploading(true);
     try {
+      // 1. Upload file
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+      
+      if (!uploadRes.ok) throw new Error('Falha no upload');
+      const uploadData = await uploadRes.json();
+      
+      // 2. Create post
       const res = await fetch('/api/posts', {
         method: 'POST',
         headers: {
@@ -48,17 +75,22 @@ export default function Home() {
         },
         body: JSON.stringify({
           type: postType,
-          url: randomImg,
+          url: uploadData.url,
           caption: caption || 'Estilo é uma forma de dizer quem você é sem ter que falar.'
         })
       });
+      
       if (res.ok) {
         setCaption('');
+        setFile(null);
         setIsPosting(false);
         fetchPosts();
       }
     } catch (e) {
       console.error(e);
+      alert('Erro ao publicar. Tente novamente.');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -144,31 +176,37 @@ export default function Home() {
             </div>
             
             <div className="flex items-center justify-between pt-4 border-t border-white/5">
-              <div className="flex gap-2">
+              <div className="flex gap-2 relative">
+                <input 
+                  type="file" 
+                  accept="image/*,video/*" 
+                  onChange={handleFileChange} 
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
                 <button 
-                  onClick={() => setPostType('photo')}
+                  type="button"
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                    postType === 'photo' ? 'bg-gold text-black' : 'bg-white/5 text-zinc-400 hover:bg-white/10'
+                    file && postType === 'photo' ? 'bg-gold text-black' : 'bg-white/5 text-zinc-400 hover:bg-white/10'
                   }`}
                 >
-                  <Camera className="w-4 h-4" /> Foto
+                  <Camera className="w-4 h-4" /> {file && postType === 'photo' ? 'Foto Selecionada' : 'Foto'}
                 </button>
                 <button 
-                  onClick={() => setPostType('video')}
+                  type="button"
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                    postType === 'video' ? 'bg-red-500 text-white' : 'bg-white/5 text-zinc-400 hover:bg-white/10'
+                    file && postType === 'video' ? 'bg-red-500 text-white' : 'bg-white/5 text-zinc-400 hover:bg-white/10'
                   }`}
                 >
-                  <Video className="w-4 h-4" /> Vídeo
+                  <Video className="w-4 h-4" /> {file && postType === 'video' ? 'Vídeo Selecionado' : 'Vídeo'}
                 </button>
               </div>
               
               <button
                 onClick={handleCreatePost}
-                disabled={!caption.trim()}
-                className="gold-button px-8 py-2 rounded-full text-xs font-bold disabled:opacity-50"
+                disabled={!caption.trim() || !file || uploading}
+                className="gold-button px-8 py-2 rounded-full text-xs font-bold disabled:opacity-50 flex items-center gap-2"
               >
-                Publicar
+                {uploading ? 'Enviando...' : 'Publicar'}
               </button>
             </div>
           </div>
