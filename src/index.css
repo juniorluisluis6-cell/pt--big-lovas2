@@ -31,3 +31,43 @@
   @apply text-black font-bold transition-transform hover:scale-105 active:scale-95;
 }
 
+.light-mode {
+  @apply bg-zinc-50 text-black;
+}
+
+.light-mode .glass {
+  @apply bg-black/5 border-black/10;
+}
+
+.light-mode .bg-premium-black {
+  @apply bg-zinc-50;
+}
+
+.light-mode .text-white {
+  @apply text-black;
+}
+
+.light-mode .text-zinc-400 {
+  @apply text-zinc-600;
+}
+
+.light-mode .text-zinc-500 {
+  @apply text-zinc-500;
+}
+
+.light-mode .border-white\/5 {
+  @apply border-black/5;
+}
+
+.light-mode .border-white\/10 {
+  @apply border-black/10;
+}
+
+.light-mode .bg-white\/5 {
+  @apply bg-black/5;
+}
+
+.light-mode .bg-zinc-800 {
+  @apply bg-zinc-200;
+}
+

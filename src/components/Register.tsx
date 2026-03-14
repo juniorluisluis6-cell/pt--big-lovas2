@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, User, Mail, Lock, Loader2, ShieldCheck } from 'lucide-react';
+import { supabase } from '../supabase';
 
 interface RegisterProps {
   onBack: () => void;
@@ -20,9 +21,18 @@ export default function Register({ onBack, onSwitch }: RegisterProps) {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    fetch('/api/auth/check-admin')
-      .then(res => res.json())
-      .then(data => setAdminExists(data.exists));
+    const checkAdmin = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'admin')
+        .limit(1);
+      
+      if (!error) {
+        setAdminExists(data && data.length > 0);
+      }
+    };
+    checkAdmin();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,28 +41,38 @@ export default function Register({ onBack, onSwitch }: RegisterProps) {
     setError('');
 
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          name, 
-          email, 
-          password, 
-          role: isAdmin ? 'admin' : 'user',
-          bi_number: biNumber,
-          age: age,
-          mpesa_number: mpesaNumber
-        })
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
       });
-      const data = await res.json();
-      if (res.ok) {
-        setSuccess(true);
-        setTimeout(onSwitch, 2000);
-      } else {
-        setError(data.error || 'Erro ao cadastrar');
-      }
-    } catch (err) {
-      setError('Erro de conexão');
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('Erro ao criar usuário');
+
+      // Create user profile in Supabase
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: authData.user.id,
+            name,
+            email,
+            role: isAdmin ? 'admin' : 'user',
+            is_premium: true,
+            bi_number: biNumber || null,
+            age: age ? parseInt(age) : null,
+            mpesa_number: mpesaNumber || null,
+            created_at: new Date().toISOString()
+          }
+        ]);
+
+      if (profileError) throw profileError;
+
+      setSuccess(true);
+      setTimeout(onSwitch, 2000);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Erro ao cadastrar');
     } finally {
       setLoading(false);
     }

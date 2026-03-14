@@ -3,9 +3,10 @@ import { motion } from 'motion/react';
 import { ArrowLeft, Crown, CheckCircle2, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../supabase';
 
 export default function PremiumUpgrade() {
-  const { user, token, refreshUser } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -20,23 +21,26 @@ export default function PremiumUpgrade() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
     setLoading(true);
 
     try {
-      const res = await fetch('/api/user/premium-request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      });
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          ...formData,
+          is_premium: true,
+          premium_since: new Date().toISOString()
+        })
+        .eq('id', user.id);
 
-      if (res.ok) {
-        navigate('/payment');
-      }
+      if (error) throw error;
+
+      alert('Parabéns! Você agora é um Membro Premium BIG LOVA.');
+      navigate('/');
     } catch (e) {
       console.error(e);
+      alert('Erro ao processar upgrade. Tente novamente.');
     } finally {
       setLoading(false);
     }

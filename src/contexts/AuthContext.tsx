@@ -1,63 +1,81 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
+import { supabase } from '../supabase';
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
-  login: (token: string, user: User) => void;
-  logout: () => void;
   isLoading: boolean;
-  refreshUser: () => Promise<void>;
+  logout: () => Promise<void>;
+  isLowDataMode: boolean;
+  setIsLowDataMode: (val: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState(true);
+  const [isLowDataMode, setIsLowDataMode] = useState(localStorage.getItem('lowDataMode') === 'true');
 
-  const refreshUser = async () => {
-    if (!token) return;
-    try {
-      const res = await fetch('/api/user/me', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const userData = await res.json();
-        setUser(userData);
+  useEffect(() => {
+    localStorage.setItem('lowDataMode', String(isLowDataMode));
+  }, [isLowDataMode]);
+
+  useEffect(() => {
+    // Check active sessions and sets the user
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        fetchProfile(session.user.id);
       } else {
-        logout();
+        setIsLoading(false);
       }
-    } catch (e) {
-      console.error(e);
+    };
+
+    getSession();
+
+    // Listen for changes on auth state (logged in, signed out, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        fetchProfile(session.user.id);
+      } else {
+        setUser(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setUser({ id: data.id, ...data } as User);
+      }
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    const init = async () => {
-      if (token) {
-        await refreshUser();
-      }
-      setIsLoading(false);
-    };
-    init();
-  }, [token]);
-
-  const login = (newToken: string, userData: User) => {
-    setToken(newToken);
-    setUser(userData);
-    localStorage.setItem('token', newToken);
-  };
-
-  const logout = () => {
-    setToken(null);
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('token');
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading, refreshUser }}>
+    <AuthContext.Provider value={{ 
+      user, logout, isLoading,
+      isLowDataMode, setIsLowDataMode
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Mail, Lock, Loader2 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../supabase';
 
 interface LoginProps {
   onBack: () => void;
@@ -8,7 +8,6 @@ interface LoginProps {
 }
 
 export default function Login({ onBack, onSwitch }: LoginProps) {
-  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,19 +19,14 @@ export default function Login({ onBack, onSwitch }: LoginProps) {
     setError('');
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-      const data = await res.json();
-      if (res.ok) {
-        login(data.token, data.user);
-      } else {
-        setError(data.error || 'Erro ao entrar');
-      }
-    } catch (err) {
-      setError('Erro de conexão');
+      if (authError) throw authError;
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Erro ao entrar');
     } finally {
       setLoading(false);
     }

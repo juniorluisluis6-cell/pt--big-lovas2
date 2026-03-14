@@ -4,9 +4,10 @@ import { ArrowLeft, Send, Image as ImageIcon, Mic, Phone, Video, MoreVertical, C
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Message, User } from '../types';
+import { supabase } from '../supabase';
 
 export default function Chat() {
-  const { user, token } = useAuth();
+  const { user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -14,91 +15,100 @@ export default function Chat() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (user?.is_premium) {
-      fetchUsers();
-    }
+    if (!user) return;
+    
+    const fetchUsers = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .neq('id', user.id);
+      
+      if (!error) {
+        setUsers(data as User[]);
+      }
+    };
+
+    fetchUsers();
+
+    // Realtime users updates
+    const channel = supabase
+      .channel('profiles-chat')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        fetchUsers();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   useEffect(() => {
-    if (selectedUser) {
+    if (selectedUser && user) {
+      const chatId = [user.id, selectedUser.id].sort().join('_');
+      
+      const fetchMessages = async () => {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('chatId', chatId)
+          .order('created_at', { ascending: true });
+        
+        if (!error) {
+          setMessages(data as Message[]);
+        }
+      };
+
       fetchMessages();
-      const interval = setInterval(fetchMessages, 3000);
-      return () => clearInterval(interval);
+
+      // Realtime messages
+      const channel = supabase
+        .channel(`chat-${chatId}`)
+        .on('postgres_changes', { 
+          event: 'INSERT', 
+          schema: 'public', 
+          table: 'messages',
+          filter: `chatId=eq.${chatId}`
+        }, (payload) => {
+          setMessages(prev => [...prev, payload.new as Message]);
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
-  }, [selectedUser]);
+  }, [selectedUser, user]);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const fetchUsers = async () => {
-    try {
-      const res = await fetch('/api/users/premium', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setUsers(data.filter((u: User) => u.id !== user?.id));
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const fetchMessages = async () => {
-    if (!selectedUser) return;
-    try {
-      const res = await fetch(`/api/messages/${selectedUser.id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setMessages(data);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedUser) return;
+    if (!newMessage.trim() || !selectedUser || !user) return;
 
+    const chatId = [user.id, selectedUser.id].sort().join('_');
     try {
-      const res = await fetch('/api/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          receiver_id: selectedUser.id,
-          content: newMessage,
-          type: 'text'
-        })
-      });
-      if (res.ok) {
-        setNewMessage('');
-        fetchMessages();
-      }
+      const { error } = await supabase
+        .from('messages')
+        .insert([
+          {
+            chatId,
+            sender_id: user.id,
+            receiver_id: selectedUser.id,
+            content: newMessage,
+            type: 'text',
+            created_at: new Date().toISOString()
+          }
+        ]);
+
+      if (error) throw error;
+      setNewMessage('');
     } catch (e) {
       console.error(e);
     }
   };
-
-  if (!user?.is_premium) {
-    return (
-      <div className="min-h-screen bg-premium-black flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-20 h-20 bg-gold/20 rounded-full flex items-center justify-center mb-6">
-          <Phone className="w-10 h-10 text-gold" />
-        </div>
-        <h1 className="text-3xl font-display font-bold mb-4">Chat Exclusivo</h1>
-        <p className="text-zinc-400 mb-8 max-w-xs">
-          O sistema de chat estilo WhatsApp está disponível apenas para membros oficiais.
-        </p>
-        <Link to="/premium-upgrade" className="gold-button px-8 py-4 rounded-full font-bold">
-          Tornar-se Membro
-        </Link>
-        <Link to="/" className="mt-6 text-zinc-500 hover:text-white">Voltar ao Início</Link>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-premium-black flex flex-col">
@@ -110,8 +120,12 @@ export default function Chat() {
               <button onClick={() => setSelectedUser(null)} className="text-zinc-400">
                 <ArrowLeft className="w-6 h-6" />
               </button>
-              <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-white/10">
-                <UserIcon className="w-6 h-6 text-zinc-400" />
+              <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-white/10 overflow-hidden">
+                {selectedUser.avatar_url ? (
+                  <img src={selectedUser.avatar_url} className="w-full h-full object-cover" />
+                ) : (
+                  <UserIcon className="w-6 h-6 text-zinc-400" />
+                )}
               </div>
               <div>
                 <h3 className="font-bold leading-none">{selectedUser.name}</h3>
@@ -130,21 +144,21 @@ export default function Chat() {
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex ${msg.sender_id === user.id ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
               >
                 <div
                   className={`max-w-[80%] p-3 rounded-2xl relative ${
-                    msg.sender_id === user.id
+                    msg.sender_id === user?.id
                       ? 'bg-gold text-black rounded-tr-none'
                       : 'glass text-white rounded-tl-none'
                   }`}
                 >
                   <p className="text-sm">{msg.content}</p>
-                  <div className={`flex items-center justify-end gap-1 mt-1 ${msg.sender_id === user.id ? 'text-black/60' : 'text-zinc-500'}`}>
+                  <div className={`flex items-center justify-end gap-1 mt-1 ${msg.sender_id === user?.id ? 'text-black/60' : 'text-zinc-50'}`}>
                     <span className="text-[10px]">
                       {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    {msg.sender_id === user.id && <CheckCheck className="w-3 h-3" />}
+                    {msg.sender_id === user?.id && <CheckCheck className="w-3 h-3" />}
                   </div>
                 </div>
               </div>
@@ -208,9 +222,13 @@ export default function Chat() {
                   onClick={() => setSelectedUser(u)}
                   className="p-4 flex items-center gap-4 hover:bg-white/5 cursor-pointer border-b border-white/5 transition-colors"
                 >
-                  <div className="w-14 h-14 rounded-full bg-zinc-800 flex items-center justify-center border border-white/10 relative">
-                    <UserIcon className="w-8 h-8 text-zinc-400" />
-                    <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-premium-black rounded-full" />
+                  <div className="w-14 h-14 rounded-full bg-zinc-800 flex items-center justify-center border border-white/10 relative overflow-hidden">
+                    {u.avatar_url ? (
+                      <img src={u.avatar_url} className="w-full h-full object-cover" />
+                    ) : (
+                      <UserIcon className="w-8 h-8 text-zinc-400" />
+                    )}
+                    <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-premium-black rounded-full z-10" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1">

@@ -4,9 +4,9 @@ import { ArrowLeft, Trophy, Crown, Star, TrendingUp, User as UserIcon } from 'lu
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { User } from '../types';
+import { supabase } from '../supabase';
 
 export default function Ranking() {
-  const { token } = useAuth();
   const [topUsers, setTopUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -16,12 +16,15 @@ export default function Ranking() {
 
   const fetchRanking = async () => {
     try {
-      const res = await fetch('/api/users/premium', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      // Simulate ranking by sorting by ID (as a proxy for activity/seniority)
-      setTopUsers(data.slice(0, 10));
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('is_premium', true)
+        .limit(10);
+      
+      if (!error) {
+        setTopUsers(data as User[]);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -50,37 +53,42 @@ export default function Ranking() {
       ) : (
         <div className="max-w-md mx-auto space-y-4">
           {topUsers.map((u, index) => (
-            <motion.div
-              key={u.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className={`glass p-4 rounded-2xl flex items-center gap-4 border ${index === 0 ? 'border-gold/50 bg-gold/5' : 'border-white/5'}`}
-            >
-              <div className="w-8 text-center font-display font-bold text-xl text-zinc-500">
-                {index + 1 === 1 ? <Crown className="w-6 h-6 text-gold mx-auto" /> : index + 1}
-              </div>
-              
-              <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center border border-white/10 overflow-hidden">
-                <UserIcon className="w-6 h-6 text-zinc-400" />
-              </div>
-
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-bold">{u.name}</h3>
-                  <Star className="w-3 h-3 text-gold fill-gold" />
+            <Link key={u.id} to={`/profile/${u.id}`}>
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className={`glass p-4 rounded-2xl flex items-center gap-4 border mb-4 ${index === 0 ? 'border-gold/50 bg-gold/5' : 'border-white/5'}`}
+              >
+                <div className="w-8 text-center font-display font-bold text-xl text-zinc-500">
+                  {index + 1 === 1 ? <Crown className="w-6 h-6 text-gold mx-auto" /> : index + 1}
                 </div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Premium Member</p>
-              </div>
-
-              <div className="text-right">
-                <div className="flex items-center gap-1 text-green-500 text-xs font-bold">
-                  <TrendingUp className="w-3 h-3" />
-                  {Math.floor(Math.random() * 100) + 50}%
+                
+                <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center border border-white/10 overflow-hidden">
+                  {u.avatar_url ? (
+                    <img src={u.avatar_url} className="w-full h-full object-cover" />
+                  ) : (
+                    <UserIcon className="w-6 h-6 text-zinc-400" />
+                  )}
                 </div>
-                <p className="text-[10px] text-zinc-600 uppercase">Engajamento</p>
-              </div>
-            </motion.div>
+
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold">{u.name}</h3>
+                    <Star className="w-3 h-3 text-gold fill-gold" />
+                  </div>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Premium Member</p>
+                </div>
+
+                <div className="text-right">
+                  <div className="flex items-center gap-1 text-green-500 text-xs font-bold">
+                    <TrendingUp className="w-3 h-3" />
+                    {Math.floor(Math.random() * 100) + 50}%
+                  </div>
+                  <p className="text-[10px] text-zinc-600 uppercase">Engajamento</p>
+                </div>
+              </motion.div>
+            </Link>
           ))}
         </div>
       )}

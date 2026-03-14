@@ -3,7 +3,6 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Welcome from './pages/Welcome';
 import Home from './pages/Home';
 import PremiumUpgrade from './pages/PremiumUpgrade';
-import Payment from './pages/Payment';
 import Chat from './pages/Chat';
 import Admin from './pages/Admin';
 import Profile from './pages/Profile';
@@ -11,6 +10,7 @@ import FashionTools from './pages/FashionTools';
 import Ranking from './pages/Ranking';
 import LiveEvents from './pages/LiveEvents';
 import Settings from './pages/Settings';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function AppRoutes() {
   const { user, isLoading } = useAuth();
@@ -27,10 +27,10 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={user ? <Home /> : <Welcome />} />
       <Route path="/premium-upgrade" element={user ? <PremiumUpgrade /> : <Navigate to="/" />} />
-      <Route path="/payment" element={user ? <Payment /> : <Navigate to="/" />} />
       <Route path="/chat" element={user ? <Chat /> : <Navigate to="/" />} />
       <Route path="/admin" element={user?.role === 'admin' ? <Admin /> : <Navigate to="/" />} />
       <Route path="/profile" element={user ? <Profile /> : <Navigate to="/" />} />
+      <Route path="/profile/:id" element={user ? <Profile /> : <Navigate to="/" />} />
       <Route path="/tools" element={user ? <FashionTools /> : <Navigate to="/" />} />
       <Route path="/ranking" element={user ? <Ranking /> : <Navigate to="/" />} />
       <Route path="/live" element={user ? <LiveEvents /> : <Navigate to="/" />} />
@@ -42,10 +42,12 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

@@ -1,0 +1,119 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name" },
+        "email": { "type": "string", "format": "email", "description": "Email address" },
+        "role": { "type": "string", "enum": ["user", "admin"], "description": "User role" },
+        "is_premium": { "type": "boolean", "description": "Premium status" },
+        "avatar_url": { "type": "string", "description": "Profile picture URL" },
+        "bi_number": { "type": "string", "description": "ID number" },
+        "birth_date": { "type": "string", "description": "Date of birth" },
+        "age": { "type": "integer", "description": "Age" },
+        "gender": { "type": "string", "description": "Gender" },
+        "address": { "type": "string", "description": "Physical address" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "height": { "type": "string", "description": "Height in cm" },
+        "mpesa_number": { "type": "string", "description": "M-Pesa number" },
+        "following_count": { "type": "integer", "description": "Number of users followed" },
+        "followers_count": { "type": "integer", "description": "Number of followers" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Account creation time" }
+      },
+      "required": ["name", "email"]
+    },
+    "Follow": {
+      "title": "Follow",
+      "description": "A follow relationship between two users",
+      "type": "object",
+      "properties": {
+        "follower_id": { "type": "string", "description": "User who is following" },
+        "following_id": { "type": "string", "description": "User being followed" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Time of follow" }
+      },
+      "required": ["follower_id", "following_id"]
+    },
+    "Post": {
+      "title": "Post",
+      "description": "A photo or video post",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "description": "Author UID" },
+        "user_name": { "type": "string", "description": "Author name" },
+        "user_avatar": { "type": "string", "description": "Author avatar URL" },
+        "type": { "type": "string", "enum": ["photo", "video"], "description": "Media type" },
+        "url": { "type": "string", "description": "Media URL" },
+        "caption": { "type": "string", "description": "Post caption" },
+        "likes_count": { "type": "integer", "description": "Number of likes" },
+        "comments_count": { "type": "integer", "description": "Number of comments" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Post creation time" }
+      },
+      "required": ["user_id", "type", "url"]
+    },
+    "Like": {
+      "title": "Like",
+      "description": "A like on a post",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "description": "User who liked" },
+        "post_id": { "type": "string", "description": "Post being liked" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Time of like" }
+      },
+      "required": ["user_id", "post_id"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A comment on a post",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "description": "User who commented" },
+        "user_name": { "type": "string", "description": "User name" },
+        "post_id": { "type": "string", "description": "Post being commented on" },
+        "content": { "type": "string", "description": "Comment text" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Time of comment" }
+      },
+      "required": ["user_id", "post_id", "content"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A direct message between users",
+      "type": "object",
+      "properties": {
+        "sender_id": { "type": "string", "description": "Sender UID" },
+        "receiver_id": { "type": "string", "description": "Receiver UID" },
+        "content": { "type": "string", "description": "Message content" },
+        "type": { "type": "string", "enum": ["text", "image"], "description": "Message type" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Time of message" }
+      },
+      "required": ["sender_id", "receiver_id", "content"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "posts/{postId}": {
+      "schema": "Post",
+      "description": "Public posts"
+    },
+    "posts/{postId}/likes/{likeId}": {
+      "schema": "Like",
+      "description": "Likes on a post"
+    },
+    "posts/{postId}/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Comments on a post"
+    },
+    "messages/{messageId}": {
+      "schema": "Message",
+      "description": "Direct messages"
+    },
+    "follows/{followId}": {
+      "schema": "Follow",
+      "description": "User follow relationships"
+    }
+  }
+}
